@@ -1,2 +1,0 @@
-# SimCpu
-Created with CodeSandbox
