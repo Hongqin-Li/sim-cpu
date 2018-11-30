@@ -51,13 +51,18 @@ export class Pipe {
     setCode(str);
     init();
   }
+
   stepi(i) {
-    stepi(i);
+    return stepi(i);
   }
-  run() {
-    while (!(Stat == SINS || Stat == SADR || Stat == SHLT)) {
-      stepi(1);
-    }
+  run(time) {
+    setTimeout(function func() {
+      if (!(Stat == SINS || Stat == SADR || Stat == SHLT)) {
+        stepi(1);
+        console.log("step");
+        setTimeout(func, time);
+      }
+    }, time);
   }
   getStageRegisters() {
     return [
@@ -1096,8 +1101,16 @@ function printStageRegisters() {
   console.log("[Fetch]");
   console.log("predPC[" + F_predPC + "]");
 }
-
-function stepi() {
+function stepi(steps) {
+  for (let i = 0; i < steps; i++) {
+    step();
+  }
+  if (Stat == SINS || Stat == SADR || Stat == SHLT) {
+    return 1;
+  }
+  return 0;
+}
+function step() {
   /** Exception **/
   if (Stat == SINS || Stat == SADR || Stat == SHLT) {
     return 1;
