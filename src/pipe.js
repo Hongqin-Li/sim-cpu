@@ -32,6 +32,8 @@ const regs = [
   ""
 ];
 
+let breakpoints = new Set();
+
 export class Pipe {
   constructor() {
     this.Memory = Memory;
@@ -46,10 +48,20 @@ export class Pipe {
   }
   init() {
     init();
+    breakpoints.clear();
   }
   setCode(str) {
     setCode(str);
     init();
+  }
+  addBreakpoint(str) {
+    breakpoints.add(str);
+  }
+  deleteBreakpoint(str) {
+    breakpoints.delete(str);
+  }
+  hasBreakpoint(str) {
+    return breakpoints.has(str);
   }
 
   stepi(i) {
@@ -64,6 +76,28 @@ export class Pipe {
       }
     }, time);
   }
+  getPC() {
+    return valToHex(F_predPC);
+  }
+  getStat() {
+    return Stat;
+  }
+  //return [ [addr, hex_val ],...]
+  getMemory() {
+    let rtn = [];
+    let pair = ["addr", "hex_val"];
+    for (let i = ((MAX_MEM - 8) >> 3) << 3; i >= 0; i -= 8) {
+      let x = valToHex(readMemory(i));
+      if (x != "0") {
+        let j = i >> 3;
+        pair[0] = i.toString(16);
+        pair[1] = x;
+        rtn.push(pair.slice());
+      }
+    }
+    return rtn;
+  }
+
   getStageRegisters() {
     return [
       [
@@ -97,7 +131,7 @@ export class Pipe {
       ],
       [
         ["stat", stats[D_stat]],
-        ["icode", icodes[D_stat]],
+        ["icode", icodes[D_icode]],
         ["ifun", "" + D_ifun],
         ["rA", regs[D_rA]],
         ["rB", regs[D_rB]],
@@ -148,7 +182,7 @@ class RegisterFile {
 
 /* Classes end */
 
-const MAX_MEM = 1000;
+const MAX_MEM = 800;
 
 const IHALT = 0,
   INOP = 1,
@@ -366,7 +400,6 @@ function setCode(code) {
       i += j - 1;
     } else isValid = false;
   }
-  console.log("memory is " + Memory);
 }
 
 function ops(a, b, ifun) {
@@ -655,21 +688,21 @@ function doFetch() {
 
   //now pc is a int
   pc = parseInt(valToHex(check_f_pc()), 16);
-  console.log("pc is" + pc);
+  //console.log("pc is" + pc);
   /** Fetch **/
   split = readMemory(pc, 1);
   align = readMemory(pc + 1, 1);
-  console.log(split);
-  console.log(align);
+  //console.log(split);
+  //console.log(align);
   icode = parseInt(split[0][0], 16);
   ifun = parseInt(split[0][1], 16);
-  console.log("icode: " + icode + ", ifun" + ifun);
+  //console.log("icode: " + icode + ", ifun" + ifun);
 
   //bool
   instr_valid = check_f_instr_valid(icode, ifun);
   need_regids = check_f_need_regids(icode);
   need_valC = check_f_need_valC(icode);
-  console.log(need_regids);
+  //console.log(need_regids);
   stat = check_f_stat(imem_error, instr_valid, icode);
 
   rA = need_regids ? parseInt(align[0][0], 16) : RNONE;
@@ -693,7 +726,7 @@ function doFetch() {
   f_valC = valC.slice();
   f_valP = valP.slice();
   f_predPC = predPC.slice();
-
+  /*
   console.log("f_stat: " + f_stat);
   console.log("f_icode: " + f_icode);
   console.log("f_ifun: " + f_ifun);
@@ -702,7 +735,7 @@ function doFetch() {
 
   console.log("f_valC: " + f_valC);
   console.log("f_valP: " + f_valP);
-  console.log("f_predPC: " + f_predPC);
+  console.log("f_predPC: " + f_predPC);*/
 }
 function doDecode() {
   let stat;
@@ -893,7 +926,7 @@ function doControlLogic() {
 function resetW() {
   W_stall = false;
   W_bubble = true;
-  W_stat = SAOK;
+  W_stat = SBUB;
   W_icode = INOP;
   W_valE = VALZERO.slice();
   W_valM = VALZERO.slice();
@@ -903,7 +936,7 @@ function resetW() {
 function resetM() {
   M_stall = false;
   M_bubble = true;
-  M_stat = SAOK;
+  M_stat = SBUB;
   M_icode = INOP;
   M_valA = VALZERO.slice();
   M_valE = VALZERO.slice();
@@ -914,7 +947,7 @@ function resetM() {
 function resetE() {
   E_stall = false;
   E_bubble = true;
-  E_stat = SAOK;
+  E_stat = SBUB;
   E_icode = INOP;
   E_ifun = 0;
   E_valA = VALZERO.slice();
@@ -929,7 +962,7 @@ function resetE() {
 function resetD() {
   D_stall = false;
   D_bubble = true;
-  D_stat = SAOK;
+  D_stat = SBUB;
   D_icode = INOP;
   D_ifun = 0;
   D_rA = RNONE;
@@ -946,7 +979,6 @@ function resetF() {
 function updateStageRegisters() {
   if (W_bubble) {
     resetW();
-    W_stat = SBUB;
   } else if (!W_stall) {
     W_stat = m_stat;
     W_icode = m_icode;
@@ -958,7 +990,6 @@ function updateStageRegisters() {
 
   if (M_bubble) {
     resetM();
-    M_stat = SBUB;
   } else if (!W_stall) {
     M_stat = e_stat;
     M_icode = e_icode;
@@ -971,7 +1002,6 @@ function updateStageRegisters() {
 
   if (E_bubble) {
     resetE();
-    E_stat = SBUB;
   } else if (!E_stall) {
     E_stat = d_stat;
     E_icode = d_icode;
@@ -987,7 +1017,6 @@ function updateStageRegisters() {
 
   if (D_bubble) {
     resetD();
-    D_stat = SBUB;
   } else if (!D_stall) {
     D_stat = f_stat;
     D_icode = f_icode;
@@ -1106,16 +1135,17 @@ function stepi(steps) {
     step();
   }
   if (Stat == SINS || Stat == SADR || Stat == SHLT) {
-    return 1;
+    return Stat;
   }
   return 0;
 }
 function step() {
   /** Exception **/
+
   if (Stat == SINS || Stat == SADR || Stat == SHLT) {
     return 1;
   }
-  console.log("clock cycle begins!");
+  //console.log("clock cycle begins!");
   /** clock cycle begins **/
 
   ///update the stage registers and registerFile
@@ -1133,51 +1163,8 @@ function step() {
   doControlLogic();
 
   /** clock cycle ends **/
-  console.log("clock cycle ends");
-  printStageRegisters();
-  console.log(registerFile);
+  //console.log("clock cycle ends");
+  //printStageRegisters();
+  //console.log(registerFile);
   return 0;
 }
-
-/*
-function App() {
-  function handleUpload(event) {
-    let fileReader = new FileReader();
-    fileReader.onload = function(event) {
-      let str = event.target.result;
-
-      
-      setCode(str);
-      init();
-      ReactDOM.render(<App />, rootElement);
-    };
-    fileReader.readAsText(event.target.files[0]);
-  }
-  return (
-    <div className="App">
-      <h1>Hello</h1>
-
-      <br />
-
-      <div>
-        <Button variant="contained" component="span" onClick={stepi}>
-          step
-        </Button>
-        <input
-          accept=".yo"
-          id="contained-button-file"
-          multiple
-          type="file"
-          style={{ display: "none" }}
-          onChange={handleUpload}
-        />
-        <label htmlFor="contained-button-file">
-          <Button variant="contained" component="span">
-            Upload
-          </Button>
-        </label>
-      </div>
-    </div>
-  );
-}
-*/

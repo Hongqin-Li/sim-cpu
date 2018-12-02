@@ -1,8 +1,32 @@
 import React, { Fragment } from "react";
 
+import Card from "@material-ui/core/Card";
+import CardHeader from "@material-ui/core/CardHeader";
+import CardMedia from "@material-ui/core/CardMedia";
+import CardContent from "@material-ui/core/CardContent";
+import CardActions from "@material-ui/core/CardActions";
+
+import Dialog from "@material-ui/core/Dialog";
+import DialogActions from "@material-ui/core/DialogActions";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogContentText from "@material-ui/core/DialogContentText";
+import DialogTitle from "@material-ui/core/DialogTitle";
+
 import Zoom from "@material-ui/core/Zoom";
+import Grow from "@material-ui/core/Grow";
+import Collapse from "@material-ui/core/Collapse";
+import Slide from "@material-ui/core/Slide";
 
 import red from "@material-ui/core/colors/red";
+import blue from "@material-ui/core/colors/blue";
+import green from "@material-ui/core/colors/green";
+import brown from "@material-ui/core/colors/brown";
+import yellow from "@material-ui/core/colors/yellow";
+import orange from "@material-ui/core/colors/orange";
+import deepOrange from "@material-ui/core/colors/deepOrange";
+import purple from "@material-ui/core/colors/purple";
+
+import grey from "@material-ui/core/colors/grey";
 
 import PropTypes from "prop-types";
 import {
@@ -10,7 +34,6 @@ import {
   createMuiTheme,
   withStyles
 } from "@material-ui/core/styles";
-import grey from "@material-ui/core/colors/grey";
 import Button from "@material-ui/core/Button";
 import Fab from "@material-ui/core/Fab";
 import Avatar from "@material-ui/core/Avatar";
@@ -32,6 +55,9 @@ import IconButton from "@material-ui/core/IconButton";
 import MenuIcon from "@material-ui/icons/Menu";
 import AddIcon from "@material-ui/icons/Add";
 import InfoIcon from "@material-ui/icons/Info";
+import CloseIcon from "@material-ui/icons/Close";
+import SettingsIcon from "@material-ui/icons/Settings";
+import ReorderIcon from "@material-ui/icons/Reorder";
 
 import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 
@@ -52,23 +78,28 @@ import ExpansionPanelSummary from "@material-ui/core/ExpansionPanelSummary";
 import ExpansionPanelDetails from "@material-ui/core/ExpansionPanelDetails";
 import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 
+import Snackbar from "@material-ui/core/Snackbar";
+
 import { Pipe } from "./pipe.js";
+
+const stats = ["", "SAOK", "SADR", "SINS", "SHLT", "SBUB"];
+let stageColor = [red[500], purple[500], orange[500], green[500], blue[500]];
+let stageRefreshTimeout = 500;
 
 let pipe = new Pipe();
 pipe.init();
+let breakPoints = new Set();
 
 const appBarHeight = 70;
 
 const theme = createMuiTheme({
   palette: {
-    /*primary: red,
-    secondary: {
-      main: '#f44336',
-    },*/
+    primary: brown
+    //secondary: ,
   },
   typography: {
     useNextVariants: true,
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: [
       "Consolas",
       "Courier New",
@@ -152,6 +183,7 @@ const styles = theme => ({
 class CodeLayout extends React.Component {
   render() {
     const { classes } = this.props;
+    const parent = this.props.parent;
     let code = this.props.code;
     let stageRegisters = pipe.getStageRegisters();
 
@@ -165,27 +197,68 @@ class CodeLayout extends React.Component {
             overflow: "auto"
           }}
         >
-          {/*}  <List dense={true}>
-            <ListSubheader className={classes.subHeader}>Code</ListSubheader>
-        */}
-          {code.map((line, index) => (
-            <div
-              style={
-                {
-                  //border: "1px blue solid"
-                }
+          {code.map((line, index) => {
+            let address;
+            if (line.length >= 5 && line[0] == "0" && line[1] == "x") {
+              let i = 2;
+              address = "";
+              while (line[i] == "0") {
+                i++;
               }
-            >
-              <Typography
-                style={{
-                  //border: "1px blue solid",
-                  fontSize: 15
-                }}
-              >
-                {line}
-              </Typography>
-            </div>
-          ))}
+              while (line[i] != ":") {
+                address += line[i++];
+              }
+              if (address.length == 0) address = "0";
+            }
+
+            return (
+              <div>
+                <Typography
+                  addr={address}
+                  //classes={addr}
+                  style={{
+                    //border: "1px blue solid",
+                    fontSize: 15
+                  }}
+                  onContextMenu={() => {}}
+                  onDoubleClick={event => {
+                    let nameMap = event.target.attributes;
+                    if (nameMap.addr == undefined) return;
+                    if (event.target.isbreakpoint) {
+                      event.target.isbreakpoint = false;
+                      //delete breakpoint
+                      pipe.deleteBreakpoint(nameMap.addr.value);
+                      breakPoints.delete(nameMap.addr.value);
+                      parent.toast(
+                        "Delete breakpoint at: 0x" + nameMap.addr.value
+                      );
+                      event.target.style.fontWeight = "normal";
+                    } else {
+                      event.target.isbreakpoint = true;
+                      //add in break point;
+                      pipe.addBreakpoint(nameMap.addr.value);
+                      breakPoints.add(nameMap.addr.value);
+                      parent.toast(
+                        "Add breakpoint at: 0x" + nameMap.addr.value
+                      );
+                      event.target.style.fontWeight = "bold";
+                    }
+                  }}
+                  onMouseEnter={event => {
+                    //console.log("mouse in");
+                    //console.log(event.clientX);
+                    event.target.style.fontWeight = "bold";
+                  }}
+                  onMouseOut={event => {
+                    if (!event.target.isbreakpoint)
+                      event.target.style.fontWeight = "normal";
+                  }}
+                >
+                  {line}
+                </Typography>
+              </div>
+            );
+          })}
           {
             //}    </List>
           }{" "}
@@ -196,12 +269,23 @@ class CodeLayout extends React.Component {
 }
 
 class StageRegistersLayout extends React.Component {
-  stages = ["Write-back", "Memory", "Execute", "Decode", "Fetch"];
-  render() {
-    const { classes } = this.props;
-    let stageRegisters = pipe.getStageRegisters();
+  state = {
+    grow: [true, false, false, false, false, false],
+    stageRegisters: this.props.stageRegisters,
+    onRefresh: false,
+    in: true
+  };
 
-    //displace begin
+  render() {
+    const delay = 10;
+    const timeout = 200;
+
+    const { classes } = this.props;
+    const stages = ["Write-back", "Memory", "Execute", "Decode", "Fetch"];
+    //console.log("render");
+    const stageRegisters = this.props.stageRegisters;
+
+    //this.setState({refresh:this.props.refresh});
     return (
       <div style={{ height: "100%", width: "100%" }}>
         <Paper style={{ height: "100%", overflow: "auto" }}>
@@ -210,52 +294,92 @@ class StageRegistersLayout extends React.Component {
               Stage Registers
             </ListSubheader>
 
-            {this.stages.map((name, index) => (
+            {stages.map((name, index) => (
               <React.Fragment>
-                <Zoom in={true}>
+                <Grow
+                  in={
+                    index == 0 && !this.state.onRefresh
+                      ? this.props.hide
+                        ? false
+                        : this.props.in
+                      : this.state.grow[index]
+                  }
+                  timeout={timeout}
+                  onEnter={() => {
+                    //console.log(index+" enter");
+                    setTimeout(() => {
+                      let newGrow = this.state.grow;
+                      newGrow[index + 1] = true;
+                      this.setState({ grow: newGrow });
+                    }, delay);
+                  }}
+                  onEntered={() => {
+                    //console.log(index + " entered ");
+                    //console.log(" onrefresh"+this.state.onRefresh);
+                    //console.log("props in "+this.props.in);
+                    if (index == 4) {
+                      this.setState({ onRefresh: false });
+                      this.setState({ in: false });
+                    }
+                  }}
+                  onExit={() => {
+                    //console.log(index+" exit");
+                    if (index == 0) {
+                      let newGrow = this.state.grow;
+                      newGrow[0] = false;
+                      this.setState({ grow: newGrow });
+                      this.setState({ onRefresh: true });
+                    }
+                    setTimeout(() => {
+                      let newGrow = this.state.grow;
+                      newGrow[index + 1] = false;
+                      this.setState({ grow: newGrow });
+                    }, delay);
+                  }}
+                  onExited={() => {
+                    //console.log(index + " exited");
+                    //console.log("******set state");
+                    if (index == 4) {
+                      let newGrow = this.state.grow;
+                      newGrow[0] = true;
+                      this.setState({ grow: newGrow });
+                      this.setState({
+                        stageRegisters: this.props.stageRegisters
+                      });
+                      //this.setState({ in: true });
+                    }
+                  }}
+                >
                   <ListItem button>
-                    <Avatar> {name[0]}</Avatar>
+                    <Avatar
+                      style={{
+                        backgroundColor:
+                          this.state.stageRegisters[index][0][1] === "SAOK" ||
+                          index == 4
+                            ? stageColor[index]
+                            : grey[500]
+                      }}
+                    >
+                      {" "}
+                      {name[0]}
+                    </Avatar>
+
                     <ListItemText
-                      primary={stageRegisters[index].map((prop, index) =>
-                        prop[1] == ""
-                          ? ""
-                          : "[" + prop[0] + "] " + prop[1] + " "
+                      primary={this.state.stageRegisters[index].map(
+                        (prop, index) =>
+                          prop[1] == ""
+                            ? ""
+                            : "[" + prop[0] + "] " + prop[1] + " "
                       )}
                     />
                   </ListItem>
-                </Zoom>
+                </Grow>
               </React.Fragment>
             ))}
           </List>
         </Paper>
       </div>
     );
-
-    /*   return (
-      <div className={classes.panel} >
-        {this.stages.map((name, index) => (
-          <ExpansionPanel >
-            <ExpansionPanelSummary
-              expandIcon={<ExpandMoreIcon />}
-              style={{  }}
-            >
-              <div style={{ flex: 1 }}>
-                <Typography>{name}</Typography>
-              </div>
-              
-            </ExpansionPanelSummary>
-            <ExpansionPanelDetails className={classes.details}>
-              <Typography>
-                {stageRegisters[index].map(
-                  (prop, index) => " [" + prop[0] + "] " + prop[1] + " "
-                )}
-              </Typography>
-            </ExpansionPanelDetails>
-          </ExpansionPanel>
-        ))}
-        
-      </div>
-    );*/
   }
 }
 
@@ -334,6 +458,98 @@ class RegisterFileLayout extends React.Component {
   }
 }
 
+class MenuLayout extends React.Component {
+  state = {
+    settingExpanded: false,
+    openMemory: false,
+    memory: []
+  };
+  Transition(props) {
+    return <Slide direction="up" {...props} />;
+  }
+
+  render() {
+    return (
+      <div>
+        <List>
+          <ListItem>
+            <ListItemText primary="HELLO" />
+          </ListItem>
+          <ListItem
+            button
+            onClick={() => {
+              this.setState({ settingExpanded: !this.state.settingExpanded });
+            }}
+          >
+            <ListItemIcon>
+              <SettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary="Setting" />
+          </ListItem>
+          <Collapse
+            in={this.state.settingExpanded}
+            timeout="auto"
+            unmountOnExit
+          >
+            <List component="div" disablePadding>
+              <ListItem button onClick={() => {}}>
+                <ListItemText inset primary="Speed" />
+              </ListItem>
+            </List>
+          </Collapse>
+
+          <ListItem
+            button
+            onClick={() => {
+              //show stack
+              this.setState({
+                openMemory: true,
+                memory: pipe.getMemory()
+              });
+            }}
+          >
+            <ListItemIcon>
+              <ReorderIcon />
+            </ListItemIcon>
+            <ListItemText primary="Memory" />
+          </ListItem>
+        </List>
+        <Divider />
+        <List>
+          <ListItem button key="About">
+            <ListItemIcon>
+              <InfoIcon />
+            </ListItemIcon>
+            <ListItemText primary="About" />
+          </ListItem>
+        </List>
+
+        <Dialog
+          open={this.state.openMemory}
+          onClose={() => {
+            this.setState({ openMemory: false });
+          }}
+          scroll="paper"
+          keepMounted
+          TransitionComponent={this.Transition}
+        >
+          <DialogTitle>Memory</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {this.state.memory.map((pair, index) => {
+                return (
+                  <Typography>{"0x" + pair[0] + ": " + pair[1]}</Typography>
+                );
+              })}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions />
+        </Dialog>
+      </div>
+    );
+  }
+}
+
 class MainLayout extends React.Component {
   constructor(props) {
     super(props);
@@ -341,19 +557,51 @@ class MainLayout extends React.Component {
     this.state = {
       code: ["Please upload a .yo file"],
       textHeight: "100%",
-      drawerOpen: false
+      drawerOpen: false,
+      onStageAnimation: false,
+      stageIn: true,
+      refreshStage: false,
+      messageQueue: [],
+      snackbarOpen: false,
+      stageRegisters: pipe.getStageRegisters(),
+      registerFile: pipe.getRegisterFile()
     };
     this.textFieldDiv = React.createRef();
   }
+  toast(msg) {
+    let msgQueue = this.state.messageQueue;
+    msgQueue.push(msg);
+    this.setState({
+      messageQueue: msgQueue,
+      snackbarOpen: !this.state.snackbarOpen
+    });
+  }
 
   handleUpload(event) {
+    //console.log(event);
     let fileReader = new FileReader();
     let str;
     let t = this;
     fileReader.onload = function(event) {
+      //console.log("fileReader onload: " + event);
+      //alert("onload");
       str = event.target.result;
       pipe.init();
       pipe.setCode(str);
+      //console.log("init get:");
+      //console.log(pipe.getStageRegisters);
+      //pipe.stepi(1);
+
+      t.setState({ stageRegisters: pipe.getStageRegisters() });
+      t.setState({ stageRegisters: pipe.getRegisterFile() });
+
+      t.setState({ stageRegisters: pipe.getStageRegisters() });
+      t.setState({ registerFile: pipe.getRegisterFile() });
+      t.setState({ stageIn: false });
+      setTimeout(() => {
+        t.setState({ stageIn: true });
+      }, 10);
+
       let codeLines = [];
       let line = "";
       let i = 0;
@@ -367,26 +615,55 @@ class MainLayout extends React.Component {
         }
         i++;
       }
-      console.log(codeLines);
       t.setState({ code: codeLines });
       //alert(pipe.Memory);
     };
-    fileReader.readAsText(event.target.files[0]);
+    if (event.target.files.length) fileReader.readAsText(event.target.files[0]);
   }
   componentDidMount() {
     // this.setState({ textHeight: this.textFieldDiv.clientHeight });
   }
-
-  runPipe(time) {
-    let this_ = this;
+  refreshStageRegisters() {
+    this.setState({ stageRegisters: pipe.getStageRegisters() });
+    this.setState({ registerFile: pipe.getRegisterFile() });
+    this.setState({ stageIn: false });
+    setTimeout(() => {
+      this.setState({ stageIn: true });
+    }, 100);
+  }
+  /* run til breakpoint */
+  runPipe(timeout) {
+    let t = this;
     setTimeout(function func() {
-      if (pipe.stepi(1) == 0) {
-        console.log("step");
-        this_.setState({ stageRegisters: pipe.getStageRegisters() });
-        this_.setState({ registerFile: pipe.getRegisterFile() });
-        setTimeout(func, time);
+      let stat = t.stepPipe(1);
+      let PC = pipe.getPC();
+      if (breakPoints.has(PC)) {
+        t.toast("Break at: 0x" + PC);
+        return;
       }
-    }, time);
+      if (stat) {
+        t.refreshStageRegisters();
+        return;
+      }
+      setTimeout(func, timeout);
+    }, timeout);
+  }
+
+  stepPipe(i) {
+    let rtn = pipe.stepi(i);
+    switch (rtn) {
+      case 2:
+        this.toast("Address Error!");
+        return rtn;
+      case 3:
+        this.toast("Instruction Invalid!");
+        return rtn;
+      case 4:
+        this.toast("Halt!");
+        return rtn;
+    }
+    this.refreshStageRegisters();
+    return rtn;
   }
 
   render() {
@@ -394,14 +671,24 @@ class MainLayout extends React.Component {
     const drawerList = (
       <div className={classes.list}>
         <List>
-          {["Inbox", "Starred", "Send email", "Drafts"].map((text, index) => (
-            <ListItem button key={text}>
-              <ListItemIcon>
-                {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-              </ListItemIcon>
-              <ListItemText primary={text} />
+          <ListItem>
+            <ListItemText primary="HELLO" />
+          </ListItem>
+          <ListItem button>
+            <ListItemText primary="Setting" />
+          </ListItem>
+          <Collapse in={this.state.expanded} timeout="auto" unmountOnExit>
+            <ListItem>
+              <ListItemText primary="Speed" onClick={e => {}} />
             </ListItem>
-          ))}
+            <ListItem>
+              <ListItemText primary="Speed" onClick={e => {}} />
+            </ListItem>
+          </Collapse>
+
+          <ListItem>
+            <ListItemText primary="" />
+          </ListItem>
         </List>
         <Divider />
         <List>
@@ -424,6 +711,7 @@ class MainLayout extends React.Component {
               this.setState({ drawerOpen: false });
             }}
           >
+            <MenuLayout />
             <div
               tabIndex={0}
               role="button"
@@ -433,16 +721,14 @@ class MainLayout extends React.Component {
               onKeyDown={() => {
                 this.setState({ drawerOpen: false });
               }}
-            >
-              {drawerList}
-            </div>
+            />
           </Drawer>
           <AppBar
             position="fixed"
             className={classes.appBar}
             style={{ display: "flex", alignContent: "center" }}
           >
-            <Toolbar style={{ border: "1px solid green", height: "100%" }}>
+            <Toolbar style={{ height: "100%" }}>
               <IconButton
                 color="inherit"
                 aria-label="Open drawer"
@@ -464,7 +750,7 @@ class MainLayout extends React.Component {
                 accept=".yo"
                 ref={ref => (this.fileUpload = ref)}
                 style={{ visibility: "hidden" }}
-                onChange={this.handleUpload}
+                onInput={this.handleUpload}
               />
 
               <Typography
@@ -477,6 +763,39 @@ class MainLayout extends React.Component {
               </Typography>
             </Toolbar>
           </AppBar>
+          {
+            //}toast
+          }
+
+          <Snackbar
+            key={0}
+            anchorOrigin={{
+              vertical: "bottom",
+              horizontal: "left"
+            }}
+            open={this.state.snackbarOpen}
+            autoHideDuration={1000}
+            onClose={() => {
+              this.setState({
+                snackbarOpen: false
+              });
+            }}
+            onExited={() => {
+              let msg = this.state.messageQueue;
+              msg.shift();
+              if (msg.length > 0) {
+                this.setState({
+                  messageQueue: msg,
+                  snackbarOpen: true
+                });
+              }
+            }}
+            ContentProps={{
+              "aria-describedby": "message-id"
+            }}
+            message={<span id="message-id">{this.state.messageQueue[0]}</span>}
+          />
+
           <main className={classes.content}>
             <div
               style={{
@@ -493,10 +812,14 @@ class MainLayout extends React.Component {
                   //flex: 1,
                   //flexBasis:10000,
                   marginRight: theme.spacing.unit * 3,
-                  width: "70%"
+                  width: "60%"
                 }}
               >
-                <CodeLayout classes={classes} code={this.state.code} />
+                <CodeLayout
+                  classes={classes}
+                  code={this.state.code}
+                  parent={this}
+                />
 
                 {/*}
                   <List>
@@ -517,20 +840,18 @@ class MainLayout extends React.Component {
               <div
                 style={{
                   //flex:1,
-                  width: "30%"
+                  width: "40%"
                 }}
               >
-                <StageRegistersLayout classes={classes} />
+                <StageRegistersLayout
+                  stageRegisters={this.state.stageRegisters}
+                  classes={classes}
+                  in={this.state.stageIn}
+                />
               </div>
             </div>
             <div style={{ marginBottom: theme.spacing.unit * 3 }}>
-              <ExpansionPanel
-                defaultExpanded={true}
-                onMouseEnter={e => {
-                  console.log("enter");
-                  console.log(this);
-                }}
-              >
+              <ExpansionPanel defaultExpanded={true} onMouseEnter={e => {}}>
                 <ExpansionPanelSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography>RegisterFile</Typography>
                 </ExpansionPanelSummary>
@@ -555,13 +876,11 @@ class MainLayout extends React.Component {
               <Fab color="secondary" aria-label="Add" style={{ margin: 30 }}>
                 <ChevronRightIcon
                   onClick={() => {
-                    pipe.stepi(1);
-                    this.setState({ stageRegisters: pipe.getStageRegisters() });
-                    this.setState({ registerFile: pipe.getRegisterFile() });
-                    console.log(this.state.stageRegisters);
+                    //this.toast("stepi");
+                    this.stepPipe(1);
                   }}
                   onDoubleClick={() => {
-                    this.runPipe(1000);
+                    this.runPipe(50);
                   }}
                 />
               </Fab>
