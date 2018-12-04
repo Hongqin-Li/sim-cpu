@@ -1,5 +1,7 @@
 import React, { Fragment } from "react";
 
+import Tooltip from "@material-ui/core/Tooltip";
+
 import Card from "@material-ui/core/Card";
 import CardHeader from "@material-ui/core/CardHeader";
 import CardMedia from "@material-ui/core/CardMedia";
@@ -87,6 +89,7 @@ const stats = ["", "SAOK", "SADR", "SINS", "SHLT", "SBUB"];
 let stageColor = [red[500], purple[500], orange[500], green[500], blue[500]];
 let stageRefreshTimeout = 500;
 let runTimeout = 100;
+let colorDel = 1;
 let pipe = new Pipe();
 pipe.init();
 let breakPoints = new Set();
@@ -619,6 +622,7 @@ class MenuLayout extends React.Component {
   state = {
     settingExpanded: false,
     openMemory: false,
+    openAbout: false,
     memory: []
   };
   Transition(props) {
@@ -673,7 +677,15 @@ class MenuLayout extends React.Component {
         </List>
         <Divider />
         <List>
-          <ListItem button key="About">
+          <ListItem
+            button
+            key="About"
+            onClick={() => {
+              this.setState({
+                openAbout: true
+              });
+            }}
+          >
             <ListItemIcon>
               <InfoIcon />
             </ListItemIcon>
@@ -700,6 +712,23 @@ class MenuLayout extends React.Component {
               })}
             </DialogContentText>
           </DialogContent>
+        </Dialog>
+        <Dialog
+          open={this.state.openAbout}
+          onClose={() => {
+            this.setState({ openAbout: false });
+          }}
+          scroll="paper"
+          keepMounted
+          TransitionComponent={this.Transition}
+        >
+          <DialogTitle>About</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              A Pipe-line Y86-64 CPU Simulator using React and Matreial-ui by
+              LeeHq
+            </DialogContentText>
+          </DialogContent>
           <DialogActions />
         </Dialog>
       </div>
@@ -712,13 +741,16 @@ class MainLayout extends React.Component {
     super(props);
     this.handleUpload = this.handleUpload.bind(this);
     this.state = {
+      colorDeg: 45,
+      colorL: 350,
+      colorR: 25,
       code: ["Please upload a .yo file"],
       textHeight: "100%",
       cardsHide: false,
       cardsHalt: false,
       fabIn: true,
       onFabTransit: false,
-
+      fabTooltipOpen: false,
       run: false,
       drawerOpen: false,
       onStageAnimation: false,
@@ -785,7 +817,16 @@ class MainLayout extends React.Component {
   }
   componentDidMount() {
     // this.setState({ textHeight: this.textFieldDiv.clientHeight });
+    let t = this;
+    setTimeout(function f() {
+      t.setState({
+        colorL: t.state.colorL + colorDel,
+        colorR: t.state.colorR + colorDel
+      });
+      setTimeout(f, 50);
+    }, 50);
   }
+
   refreshStageRegisters() {
     this.setState({ stageRegisters: pipe.getStageRegisters() });
     this.setState({ registerFile: pipe.getRegisterFile() });
@@ -798,6 +839,8 @@ class MainLayout extends React.Component {
   /* run til breakpoint */
   runPipe(timeout = runTimeout) {
     let t = this;
+    let temp = colorDel;
+    colorDel = 10;
     //t.setState({run:true});
     setTimeout(function func() {
       let stat = t.stepPipe(1, 0);
@@ -808,6 +851,7 @@ class MainLayout extends React.Component {
           fabIn: false
           //run:false,
         });
+        colorDel = temp;
         return;
       }
       t.refreshStageRegisters();
@@ -893,7 +937,18 @@ class MainLayout extends React.Component {
           <AppBar
             position="fixed"
             className={classes.appBar}
-            style={{ display: "flex", alignContent: "center" }}
+            style={{
+              display: "flex",
+              alignContent: "center",
+              background:
+                "linear-gradient(" +
+                this.state.colorDeg +
+                "deg, hsl(" +
+                this.state.colorL +
+                ",50%,60%) 30%, hsl(" +
+                this.state.colorR +
+                ",50%,60%)  90%)"
+            }}
           >
             <Toolbar style={{ height: "100%" }}>
               <IconButton
@@ -905,13 +960,14 @@ class MainLayout extends React.Component {
               >
                 <MenuIcon />
               </IconButton>
-
-              <IconButton
-                color="inherit"
-                onClick={() => this.fileUpload.click()}
-              >
-                <AddIcon />
-              </IconButton>
+              <Tooltip title="Upload" enterDelay={1000} leaveDelay={200}>
+                <IconButton
+                  color="inherit"
+                  onClick={() => this.fileUpload.click()}
+                >
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
               <input
                 type="file"
                 accept=".yo"
@@ -994,21 +1050,6 @@ class MainLayout extends React.Component {
                   code={this.state.code}
                   parent={this}
                 />
-
-                {/*}
-                  <List>
-                    <ListItem button key="About" >
-                    <React.Fragment>
-                      <ListItemIcon>
-                        <InfoIcon />
-                      </ListItemIcon>bbggbbbgbbgbg
-                      <ListItemText primary="Abutsldkjfslkdjfoksjdhfkkkkkkkkkkkkkkkkkkkkkkkkkkkkskkkssdkjskjh"/>
-                    </React.Fragment>
-                    </ListItem>
-                  </List>
-                </Paper>
-
-                {*/}
               </div>
 
               <div
@@ -1046,62 +1087,96 @@ class MainLayout extends React.Component {
               right: 0
             }}
           >
-            <Zoom
-              in={this.state.fabIn}
-              onEntered={() => {
-                this.setState({
-                  onFabTransit: false
-                });
-                if (this.state.run) {
-                  this.runPipe();
-                }
-              }}
-              onExit={() => {
-                this.setState({
-                  onFabTransit: true
-                });
-              }}
-              onExited={() => {
-                this.setState({
-                  fabIn: true,
-                  run: !this.state.run
-                });
-              }}
-            >
-              <Fab color="secondary" style={{ margin: theme.spacing.unit * 3 }}>
-                {this.state.run ? (
-                  <PauseIcon
-                    onClick={() => {
-                      //this.toast("stepi");
-                      this.toast("Stop at ");
-                      this.setState({
-                        fabIn: false
-                      });
-                    }}
-                  />
-                ) : (
-                  <ChevronRightIcon
-                    onClick={() => {
-                      //this.toast("stepi");
-                      this.stepPipe(1);
-                    }}
-                    onDoubleClick={() => {
-                      if (this.state.onFabTransit) {
-                        return;
-                      }
-                      console.log(this.state.run);
-                      this.toast("Run");
-                      this.setState({
-                        fabIn: false
-                      });
-                    }}
-                  />
-                )}
-              </Fab>
-            </Zoom>
+            <TriTooltip title="Double Click to Run">
+              <Zoom
+                in={this.state.fabIn}
+                onEntered={() => {
+                  this.setState({
+                    onFabTransit: false
+                  });
+                  if (this.state.run) {
+                    this.runPipe();
+                  }
+                }}
+                onExit={() => {
+                  this.setState({
+                    onFabTransit: true
+                  });
+                }}
+                onExited={() => {
+                  this.setState({
+                    fabIn: true,
+                    run: !this.state.run
+                  });
+                }}
+              >
+                <Fab
+                  color="secondary"
+                  style={{ margin: theme.spacing.unit * 3 }}
+                >
+                  {this.state.run ? (
+                    <PauseIcon
+                      onClick={() => {
+                        //this.toast("stepi");
+                        this.toast("Stop at ");
+                        this.setState({
+                          fabIn: false
+                        });
+                      }}
+                    />
+                  ) : (
+                    <ChevronRightIcon
+                      onClick={() => {
+                        //this.toast("stepi");
+                        this.stepPipe(1);
+                      }}
+                      onDoubleClick={() => {
+                        if (this.state.onFabTransit) {
+                          return;
+                        }
+                        console.log(this.state.run);
+                        this.toast("Run");
+                        this.setState({
+                          fabIn: false
+                        });
+                      }}
+                    />
+                  )}
+                </Fab>
+              </Zoom>
+            </TriTooltip>
           </div>
         </MuiThemeProvider>
       </div>
+    );
+  }
+}
+class TriTooltip extends React.Component {
+  state = {
+    open: false,
+    cnt: 3
+  };
+  render() {
+    const props = this.props;
+    return (
+      <Tooltip
+        title={this.props.title}
+        enterDelay={500}
+        leaveDelay={200}
+        onOpen={() => {
+          if (!this.state.cnt) return;
+          this.setState({ cnt: this.state.cnt - 1 });
+          this.setState({ open: true });
+        }}
+        onClose={() => {
+          this.setState({ open: false });
+        }}
+        open={this.state.open}
+        enterDelay={500}
+        leaveDelay={200}
+      >
+        {props.children}
+      </Tooltip>
     );
   }
 }
