@@ -808,9 +808,9 @@ class MainLayout extends React.Component {
           fabIn: false
           //run:false,
         });
-        t.refreshStageRegisters();
         return;
       }
+      t.refreshStageRegisters();
 
       setTimeout(func, timeout);
     }, timeout);
