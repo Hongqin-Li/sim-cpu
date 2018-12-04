@@ -5,6 +5,7 @@ import CardHeader from "@material-ui/core/CardHeader";
 import CardMedia from "@material-ui/core/CardMedia";
 import CardContent from "@material-ui/core/CardContent";
 import CardActions from "@material-ui/core/CardActions";
+import CardActionArea from "@material-ui/core/CardActionArea";
 
 import Dialog from "@material-ui/core/Dialog";
 import DialogActions from "@material-ui/core/DialogActions";
@@ -58,7 +59,7 @@ import InfoIcon from "@material-ui/icons/Info";
 import CloseIcon from "@material-ui/icons/Close";
 import SettingsIcon from "@material-ui/icons/Settings";
 import ReorderIcon from "@material-ui/icons/Reorder";
-
+import PauseIcon from "@material-ui/icons/Pause";
 import ChevronRightIcon from "@material-ui/icons/ChevronRight";
 
 import TextField from "@material-ui/core/TextField";
@@ -85,7 +86,7 @@ import { Pipe } from "./pipe.js";
 const stats = ["", "SAOK", "SADR", "SINS", "SHLT", "SBUB"];
 let stageColor = [red[500], purple[500], orange[500], green[500], blue[500]];
 let stageRefreshTimeout = 500;
-
+let runTimeout = 100;
 let pipe = new Pipe();
 pipe.init();
 let breakPoints = new Set();
@@ -179,6 +180,162 @@ const styles = theme => ({
     paddingRight: theme.spacing.unit * 2
   }
 });
+
+class StageCards extends React.Component {
+  state = {
+    grow: [true, false, false, false, false, false],
+    stageRegisters: this.props.stageRegisters,
+    onRefresh: false,
+    in: true,
+    x: 0,
+    y: 0,
+    position: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    ref: [undefined, undefined, undefined, undefined, undefined]
+  };
+  changePosition(index) {
+    let rect = this.ref[index].getBoundingClientRect();
+    let randX = Math.random();
+    let randY = Math.random();
+
+    let x =
+      (window.innerWidth / 5 - rect.width / 2) * randX +
+      ((window.innerWidth * 4) / 5 - rect.width / 2) * (1 - randX);
+    let y =
+      (window.innerHeight / 3 - rect.height / 2) * randY +
+      ((window.innerHeight * 2) / 3 - rect.height / 2) * (1 - randY);
+    let newPos = this.state.position;
+    newPos[index][0] = x;
+    newPos[index][1] = y;
+    this.setState({
+      position: newPos
+    });
+  }
+
+  componentDidMount() {
+    for (let i = 0; i < 5; i++) this.changePosition(i);
+  }
+  render() {
+    const delay = 10;
+    const timeout = 200;
+    if (this.ref == undefined) {
+      this.ref = [];
+      this.ref.length = 5;
+    }
+
+    const { classes } = this.props;
+    const stages = ["Write-back", "Memory", "Execute", "Decode", "Fetch"];
+    //console.log("render");
+    const stageRegisters = this.props.stageRegisters;
+
+    //this.setState({refresh:this.props.refresh});
+    return stages.map((name, index) => (
+      <div
+        style={{
+          position: "absolute",
+          zIndex: 10,
+          left: this.state.position[index][0],
+          top: this.state.position[index][1]
+        }}
+        ref={ref => {
+          this.ref[index] = ref;
+        }}
+      >
+        <React.Fragment>
+          <Grow
+            unmountOnExit
+            //mountOnEnter
+
+            in={
+              index == 0 && !this.state.onRefresh
+                ? !this.props.hide
+                : this.state.grow[index]
+            }
+            timeout={timeout}
+            onEnter={() => {
+              //console.log(index+" enter");
+              if (index == 0) this.setState({ onRefresh: true });
+              setTimeout(() => {
+                let newGrow = this.state.grow;
+                newGrow[index + 1] = true;
+                this.setState({ grow: newGrow });
+              }, delay);
+            }}
+            onEntered={() => {
+              if (index == 4) {
+                let newGrow = this.state.grow;
+                newGrow[0] = false;
+                this.setState({ grow: newGrow });
+              }
+            }}
+            onExit={() => {
+              //console.log(index+" exit");
+              if (index == 0) {
+                this.setState({ onRefresh: true });
+              }
+              setTimeout(() => {
+                let newGrow = this.state.grow;
+                newGrow[index + 1] = false;
+                this.setState({ grow: newGrow });
+              }, delay);
+            }}
+            onExited={() => {
+              //console.log(index + " exited");
+              //console.log("******set state");
+              this.changePosition(index);
+              if (index == 4) {
+                this.setState({
+                  onRefresh: false,
+                  stageRegisters: this.props.stageRegisters
+                });
+                if (this.props.hide) return;
+                let newGrow = this.state.grow;
+                newGrow[0] = true;
+                this.setState({ grow: newGrow });
+                //this.setState({ in: true });
+              }
+            }}
+          >
+            <Card>
+              <CardActionArea
+                style={{
+                  backgroundColor:
+                    this.state.stageRegisters[index][0][1] === "SAOK" ||
+                    index == 4
+                      ? stageColor[index]
+                      : grey[500]
+                }}
+              >
+                <CardHeader
+                  avatar={
+                    <Avatar
+                      style={{
+                        backgroundColor:
+                          this.state.stageRegisters[index][0][1] === "SAOK" ||
+                          index == 4
+                            ? stageColor[index]
+                            : grey[500]
+                      }}
+                    >
+                      {name[0]}
+                    </Avatar>
+                  }
+                  title={name}
+                />
+              </CardActionArea>
+              <CardContent>
+                {this.state.stageRegisters[index].map((prop, index) => (
+                  <Typography component="p">
+                    {prop[1] == "" ? "" : "[" + prop[0] + "] " + prop[1] + " "}{" "}
+                  </Typography>
+                ))}
+              </CardContent>
+            </Card>
+          </Grow>
+        </React.Fragment>
+      </div>
+    ));
+  }
+}
 
 class CodeLayout extends React.Component {
   render() {
@@ -557,6 +714,12 @@ class MainLayout extends React.Component {
     this.state = {
       code: ["Please upload a .yo file"],
       textHeight: "100%",
+      cardsHide: false,
+      cardsHalt: false,
+      fabIn: true,
+      onFabTransit: false,
+
+      run: false,
       drawerOpen: false,
       onStageAnimation: false,
       stageIn: true,
@@ -631,25 +794,29 @@ class MainLayout extends React.Component {
       this.setState({ stageIn: true });
     }, 100);
   }
+
   /* run til breakpoint */
-  runPipe(timeout) {
+  runPipe(timeout = runTimeout) {
     let t = this;
+    //t.setState({run:true});
     setTimeout(function func() {
-      let stat = t.stepPipe(1);
+      let stat = t.stepPipe(1, 0);
       let PC = pipe.getPC();
-      if (breakPoints.has(PC)) {
-        t.toast("Break at: 0x" + PC);
-        return;
-      }
-      if (stat) {
+      if (stat || breakPoints.has(PC)) {
+        t.toast("Stop at: 0x" + PC);
+        t.setState({
+          fabIn: false
+          //run:false,
+        });
         t.refreshStageRegisters();
         return;
       }
+
       setTimeout(func, timeout);
     }, timeout);
   }
 
-  stepPipe(i) {
+  stepPipe(i, flag = 1) {
     let rtn = pipe.stepi(i);
     switch (rtn) {
       case 2:
@@ -662,7 +829,7 @@ class MainLayout extends React.Component {
         this.toast("Halt!");
         return rtn;
     }
-    this.refreshStageRegisters();
+    if (flag) this.refreshStageRegisters();
     return rtn;
   }
 
@@ -797,6 +964,13 @@ class MainLayout extends React.Component {
           />
 
           <main className={classes.content}>
+            <div>
+              <StageCards
+                stageRegisters={this.state.stageRegisters}
+                classes={classes}
+                hide={!this.state.run}
+              />
+            </div>
             <div
               style={{
                 width: "100%",
@@ -851,7 +1025,7 @@ class MainLayout extends React.Component {
               </div>
             </div>
             <div style={{ marginBottom: theme.spacing.unit * 3 }}>
-              <ExpansionPanel defaultExpanded={true} onMouseEnter={e => {}}>
+              <ExpansionPanel defaultExpanded={false} onMouseEnter={e => {}}>
                 <ExpansionPanelSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography>RegisterFile</Typography>
                 </ExpansionPanelSummary>
@@ -872,17 +1046,57 @@ class MainLayout extends React.Component {
               right: 0
             }}
           >
-            <Zoom in="true">
-              <Fab color="secondary" aria-label="Add" style={{ margin: 30 }}>
-                <ChevronRightIcon
-                  onClick={() => {
-                    //this.toast("stepi");
-                    this.stepPipe(1);
-                  }}
-                  onDoubleClick={() => {
-                    this.runPipe(50);
-                  }}
-                />
+            <Zoom
+              in={this.state.fabIn}
+              onEntered={() => {
+                this.setState({
+                  onFabTransit: false
+                });
+                if (this.state.run) {
+                  this.runPipe();
+                }
+              }}
+              onExit={() => {
+                this.setState({
+                  onFabTransit: true
+                });
+              }}
+              onExited={() => {
+                this.setState({
+                  fabIn: true,
+                  run: !this.state.run
+                });
+              }}
+            >
+              <Fab color="secondary" style={{ margin: theme.spacing.unit * 3 }}>
+                {this.state.run ? (
+                  <PauseIcon
+                    onClick={() => {
+                      //this.toast("stepi");
+                      this.toast("Stop at ");
+                      this.setState({
+                        fabIn: false
+                      });
+                    }}
+                  />
+                ) : (
+                  <ChevronRightIcon
+                    onClick={() => {
+                      //this.toast("stepi");
+                      this.stepPipe(1);
+                    }}
+                    onDoubleClick={() => {
+                      if (this.state.onFabTransit) {
+                        return;
+                      }
+                      console.log(this.state.run);
+                      this.toast("Run");
+                      this.setState({
+                        fabIn: false
+                      });
+                    }}
+                  />
+                )}
               </Fab>
             </Zoom>
           </div>
