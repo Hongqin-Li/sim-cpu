@@ -1,6 +1,7 @@
 import React, { Fragment } from "react";
 
 import Tooltip from "@material-ui/core/Tooltip";
+import Popover from "@material-ui/core/Popover";
 
 import Card from "@material-ui/core/Card";
 import CardHeader from "@material-ui/core/CardHeader";
@@ -14,6 +15,8 @@ import DialogActions from "@material-ui/core/DialogActions";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogContentText from "@material-ui/core/DialogContentText";
 import DialogTitle from "@material-ui/core/DialogTitle";
+import MenuItem from "@material-ui/core/MenuItem";
+import Menu from "@material-ui/core/Menu";
 
 import Zoom from "@material-ui/core/Zoom";
 import Grow from "@material-ui/core/Grow";
@@ -84,11 +87,18 @@ import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
 import Snackbar from "@material-ui/core/Snackbar";
 
 import { Pipe } from "./pipe.js";
+const appBarTitle = "COLORFUL CPU";
 
 const stats = ["", "SAOK", "SADR", "SINS", "SHLT", "SBUB"];
+const aboutText =
+  "A Pipe-line Y86-64 CPU Simulator using React and Matreial-ui by Leehq";
 let stageColor = [red[500], purple[500], orange[500], green[500], blue[500]];
+
 let stageRefreshTimeout = 500;
-let runTimeout = 100;
+
+let runTimeout = 1000;
+const speedOpt = [1, 5, 10, 20];
+
 let colorDel = 1;
 let pipe = new Pipe();
 pipe.init();
@@ -98,8 +108,11 @@ const appBarHeight = 70;
 
 const theme = createMuiTheme({
   palette: {
-    primary: brown
+    primary: brown,
     //secondary: ,
+    background: {
+      default: grey[200]
+    }
   },
   typography: {
     useNextVariants: true,
@@ -126,7 +139,8 @@ const styles = theme => ({
   root: {
     display: "flex",
     width: "100%",
-    height: "100%"
+    height: "100%",
+    backgroundColor: grey[200]
   },
   appBar: {
     height: appBarHeight
@@ -218,8 +232,9 @@ class StageCards extends React.Component {
     for (let i = 0; i < 5; i++) this.changePosition(i);
   }
   render() {
-    const delay = 10;
-    const timeout = 200;
+    const time = runTimeout / 10;
+    const timeout = time > 200 ? time : 200;
+    const delay = timeout >> 2;
     if (this.ref == undefined) {
       this.ref = [];
       this.ref.length = 5;
@@ -432,8 +447,11 @@ class StageRegistersLayout extends React.Component {
   state = {
     grow: [true, false, false, false, false, false],
     stageRegisters: this.props.stageRegisters,
+    stageStuffs: this.props.stageStuffs,
     onRefresh: false,
-    in: true
+    in: true,
+    anchorEl: null,
+    popText: ""
   };
 
   render() {
@@ -444,7 +462,8 @@ class StageRegistersLayout extends React.Component {
     const stages = ["Write-back", "Memory", "Execute", "Decode", "Fetch"];
     //console.log("render");
     const stageRegisters = this.props.stageRegisters;
-
+    const stageStuffs = this.props.stageStuffs;
+    const { anchorEl } = this.state;
     //this.setState({refresh:this.props.refresh});
     return (
       <div style={{ height: "100%", width: "100%" }}>
@@ -453,6 +472,29 @@ class StageRegistersLayout extends React.Component {
             <ListSubheader className={classes.subHeader}>
               Stage Registers
             </ListSubheader>
+
+            <Popover
+              id="simple-popper"
+              open={Boolean(anchorEl)}
+              anchorEl={anchorEl}
+              onClose={() => {
+                this.setState({
+                  anchorEl: null
+                });
+              }}
+              anchorOrigin={{
+                vertical: "bottom",
+                horizontal: "center"
+              }}
+              transformOrigin={{
+                vertical: "top",
+                horizontal: "center"
+              }}
+            >
+              <Typography style={{ margin: theme.spacing.unit * 2 }}>
+                {this.state.popText}
+              </Typography>
+            </Popover>
 
             {stages.map((name, index) => (
               <React.Fragment>
@@ -510,7 +552,20 @@ class StageRegistersLayout extends React.Component {
                     }
                   }}
                 >
-                  <ListItem button>
+                  <ListItem
+                    button
+                    onClick={event => {
+                      this.setState({
+                        popText: this.props.stageStuffs[index].map(
+                          (prop, index) =>
+                            prop[1] == "" || prop[1] == undefined
+                              ? ""
+                              : "[" + prop[0] + "] " + prop[1] + " "
+                        ),
+                        anchorEl: event.currentTarget
+                      });
+                    }}
+                  >
                     <Avatar
                       style={{
                         backgroundColor:
@@ -623,13 +678,17 @@ class MenuLayout extends React.Component {
     settingExpanded: false,
     openMemory: false,
     openAbout: false,
-    memory: []
+    memory: [],
+    speedMenuOpen: false,
+    anchorEl: null,
+    speedIndex: 0
   };
   Transition(props) {
     return <Slide direction="up" {...props} />;
   }
 
   render() {
+    const { anchorEl } = this.state;
     return (
       <div>
         <List>
@@ -653,10 +712,39 @@ class MenuLayout extends React.Component {
             unmountOnExit
           >
             <List component="div" disablePadding>
-              <ListItem button onClick={() => {}}>
+              <ListItem
+                button
+                onClick={event => {
+                  this.setState({ anchorEl: event.currentTarget });
+                }}
+              >
                 <ListItemText inset primary="Speed" />
               </ListItem>
             </List>
+            <Menu
+              id="speed-menu"
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={() => {
+                //runTimeout = 1000/ speedOpt[this.state.speedIndex];
+                //console.log("runtimeout:"+runTimeout);
+                this.setState({ anchorEl: null });
+              }}
+            >
+              {speedOpt.map((option, index) => (
+                <MenuItem
+                  key={option}
+                  selected={index === this.state.speedIndex}
+                  onClick={event => {
+                    runTimeout = 1000 / speedOpt[index];
+                    console.log("runtimeout:" + runTimeout);
+                    this.setState({ speedIndex: index, anchorEl: null });
+                  }}
+                >
+                  {speedOpt[index]}
+                </MenuItem>
+              ))}
+            </Menu>
           </Collapse>
 
           <ListItem
@@ -724,10 +812,7 @@ class MenuLayout extends React.Component {
         >
           <DialogTitle>About</DialogTitle>
           <DialogContent>
-            <DialogContentText>
-              A Pipe-line Y86-64 CPU Simulator using React and Matreial-ui by
-              LeeHq
-            </DialogContentText>
+            <DialogContentText>{aboutText}</DialogContentText>
           </DialogContent>
           <DialogActions />
         </Dialog>
@@ -758,7 +843,9 @@ class MainLayout extends React.Component {
       refreshStage: false,
       messageQueue: [],
       snackbarOpen: false,
+      anchorEl: null,
       stageRegisters: pipe.getStageRegisters(),
+      stageStuffs: pipe.getStageStuffs(),
       registerFile: pipe.getRegisterFile()
     };
     this.textFieldDiv = React.createRef();
@@ -823,21 +910,26 @@ class MainLayout extends React.Component {
         colorL: t.state.colorL + colorDel,
         colorR: t.state.colorR + colorDel
       });
-      setTimeout(f, 50);
-    }, 50);
+      setTimeout(f, 20);
+    }, 20);
   }
 
-  refreshStageRegisters() {
+  refreshStageRegisters(flag = 1) {
     this.setState({ stageRegisters: pipe.getStageRegisters() });
     this.setState({ registerFile: pipe.getRegisterFile() });
-    this.setState({ stageIn: false });
-    setTimeout(() => {
-      this.setState({ stageIn: true });
-    }, 100);
+    this.setState({
+      stageStuffs: pipe.getStageStuffs()
+    });
+    if (flag) {
+      this.setState({ stageIn: false });
+      setTimeout(() => {
+        this.setState({ stageIn: true });
+      }, 100);
+    }
   }
 
   /* run til breakpoint */
-  runPipe(timeout = runTimeout) {
+  runPipe() {
     let t = this;
     let temp = colorDel;
     colorDel = 10;
@@ -845,19 +937,20 @@ class MainLayout extends React.Component {
     setTimeout(function func() {
       let stat = t.stepPipe(1, 0);
       let PC = pipe.getPC();
-      if (stat || breakPoints.has(PC)) {
+      if (!t.state.run || stat || breakPoints.has(PC)) {
         t.toast("Stop at: 0x" + PC);
-        t.setState({
-          fabIn: false
-          //run:false,
-        });
+        if (t.state.run) {
+          t.setState({
+            fabIn: false
+          });
+        }
         colorDel = temp;
+        t.refreshStageRegisters();
         return;
       }
-      t.refreshStageRegisters();
 
-      setTimeout(func, timeout);
-    }, timeout);
+      setTimeout(func, runTimeout);
+    }, runTimeout);
   }
 
   stepPipe(i, flag = 1) {
@@ -873,12 +966,14 @@ class MainLayout extends React.Component {
         this.toast("Halt!");
         return rtn;
     }
-    if (flag) this.refreshStageRegisters();
+    this.refreshStageRegisters(flag);
     return rtn;
   }
 
   render() {
     const { classes } = this.props;
+    const { anchorEl } = this.state;
+
     const drawerList = (
       <div className={classes.list}>
         <List>
@@ -982,7 +1077,7 @@ class MainLayout extends React.Component {
                 noWrap
                 style={{ position: "absolute", right: 30 }}
               >
-                Y86-64 CPU Simulator
+                {appBarTitle}
               </Typography>
             </Toolbar>
           </AppBar>
@@ -1060,6 +1155,7 @@ class MainLayout extends React.Component {
               >
                 <StageRegistersLayout
                   stageRegisters={this.state.stageRegisters}
+                  stageStuffs={this.state.stageStuffs}
                   classes={classes}
                   in={this.state.stageIn}
                 />
@@ -1118,10 +1214,10 @@ class MainLayout extends React.Component {
                     <PauseIcon
                       onClick={() => {
                         //this.toast("stepi");
-                        this.toast("Stop at ");
                         this.setState({
                           fabIn: false
                         });
+                        //this.refreshStageRegisters();
                       }}
                     />
                   ) : (
@@ -1134,7 +1230,6 @@ class MainLayout extends React.Component {
                         if (this.state.onFabTransit) {
                           return;
                         }
-                        console.log(this.state.run);
                         this.toast("Run");
                         this.setState({
                           fabIn: false
