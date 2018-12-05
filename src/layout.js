@@ -910,8 +910,8 @@ class MainLayout extends React.Component {
         colorL: t.state.colorL + colorDel,
         colorR: t.state.colorR + colorDel
       });
-      setTimeout(f, 50);
-    }, 50);
+      setTimeout(f, 20);
+    }, 20);
   }
 
   refreshStageRegisters(flag = 1) {
