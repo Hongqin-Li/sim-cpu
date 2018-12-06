@@ -393,7 +393,9 @@ function xorq(valA, valB) {
 /* read eight bytes from memory, return null when error*/
 /* return rtn = ["00", "02", ...] */
 function readMemory(addr, bytes = 8) {
-  if (addr + bytes > MAX_MEM || addr < 0) return null;
+  if (addr + bytes > MAX_MEM || addr < 0) {
+    return null;
+  }
   let rtn = VALZERO.slice();
   rtn.length = bytes;
   for (let i = 0; i < bytes; i++) {
@@ -409,6 +411,7 @@ function writeMemory(addr, val) {
   for (let i = 0; i < len; i++) {
     Memory[addr + i] = val[i];
   }
+  return true;
 }
 
 function setCode(code) {
@@ -905,9 +908,11 @@ function doMemory() {
 
   if (mem_read) valM = readMemory(addr, 8);
 
+  let temp = 1;
   if (mem_write) {
-    writeMemory(addr, data_in);
+    temp = writeMemory(addr, data_in);
   }
+  if (valM == null || temp == null) dmem_error = true;
 
   stat = dmem_error ? SADR : M_stat;
 
