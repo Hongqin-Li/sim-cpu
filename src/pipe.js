@@ -97,6 +97,49 @@ export class Pipe {
     }
     return rtn;
   }
+  getStageStuffs() {
+    return [
+      [
+        ["m_stat", stats[m_stat]],
+        ["m_icode", icodes[m_icode]],
+        ["m_valE", valToHex(m_valE)],
+        ["m_valM", valToHex(m_valM)],
+        ["m_dstE", regs[m_dstE]],
+        ["m_dstM", regs[m_dstM]]
+      ],
+      [
+        ["e_stat", stats[e_stat]],
+        ["e_icodes", icodes[e_icode]],
+        ["e_Cnd", e_Cnd ? "Y" : "N"],
+        ["e_valE", valToHex(e_valE)],
+        ["e_valA", valToHex(e_valA)],
+        ["e_dstE", regs[e_dstE]],
+        ["e_dstM", regs[e_dstM]]
+      ],
+      [
+        ["d_stat", stats[d_stat]],
+        ["d_icode", icodes[d_icode]],
+        ["d_ifun", "" + d_ifun],
+        ["d_valC", valToHex(d_valC)],
+        ["d_valA", valToHex(d_valA)],
+        ["d_valB", valToHex(d_valB)],
+        ["d_dstE", regs[d_dstE]],
+        ["d_dstM", regs[d_dstM]],
+        ["d_srcA", regs[d_srcA]],
+        ["d_srcB", regs[d_srcB]]
+      ],
+      [
+        ["f_stat", stats[f_stat]],
+        ["f_icode", icodes[f_icode]],
+        ["f_ifun", "" + f_ifun],
+        ["f_rA", regs[f_rA]],
+        ["f_rB", regs[f_rB]],
+        ["f_valC", valToHex(f_valC)],
+        ["f_valP", valToHex(f_valP)]
+      ],
+      [["predPC", valToHex(F_predPC)]]
+    ];
+  }
 
   getStageRegisters() {
     return [
@@ -284,9 +327,11 @@ function intToVal(x) {
 }
 /* return string */
 function valToHex(val) {
+  if (val == undefined) return "0";
   let rtn = "";
   let zero_front = true;
   let i = 7;
+
   while (i >= 0 && parseInt(val[i], 16) == 0) {
     i--;
   }
@@ -348,7 +393,9 @@ function xorq(valA, valB) {
 /* read eight bytes from memory, return null when error*/
 /* return rtn = ["00", "02", ...] */
 function readMemory(addr, bytes = 8) {
-  if (addr + bytes > MAX_MEM || addr < 0) return null;
+  if (addr + bytes > MAX_MEM || addr < 0) {
+    return null;
+  }
   let rtn = VALZERO.slice();
   rtn.length = bytes;
   for (let i = 0; i < bytes; i++) {
@@ -364,6 +411,7 @@ function writeMemory(addr, val) {
   for (let i = 0; i < len; i++) {
     Memory[addr + i] = val[i];
   }
+  return true;
 }
 
 function setCode(code) {
@@ -860,9 +908,11 @@ function doMemory() {
 
   if (mem_read) valM = readMemory(addr, 8);
 
+  let temp = 1;
   if (mem_write) {
-    writeMemory(addr, data_in);
+    temp = writeMemory(addr, data_in);
   }
+  if (valM == null || temp == null) dmem_error = true;
 
   stat = dmem_error ? SADR : M_stat;
 
