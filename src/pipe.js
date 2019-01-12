@@ -51,8 +51,9 @@ export class Pipe {
     breakpoints.clear();
   }
   setCode(str) {
-    setCode(str);
     init();
+    setCode(str);
+    //init();
   }
   addBreakpoint(str) {
     breakpoints.add(str);
@@ -82,12 +83,22 @@ export class Pipe {
   getStat() {
     return Stat;
   }
+  getValueFromMemory(addr, byte = 8) {
+    let val = readMemory(addr, byte, 1);
+    let rtn = "";
+    for (let i = 0; i < val.length; i++) {
+      rtn += val[i];
+    }
+    return rtn;
+  }
   //return [ [addr, hex_val ],...]
   getMemory() {
     let rtn = [];
     let pair = ["addr", "hex_val"];
     for (let i = ((MAX_MEM - 8) >> 3) << 3; i >= 0; i -= 8) {
-      let x = valToHex(readMemory(i));
+      let x = valToHex(readMemory(i, 8, 1));
+      //let x = valToHex(Memory[i]);
+
       if (x != "0") {
         let j = i >> 3;
         pair[0] = i.toString(16);
@@ -97,6 +108,42 @@ export class Pipe {
     }
     return rtn;
   }
+
+  getCache() {
+    let rtn = [];
+    rtn.length = cache.length;
+    for (let i = 0; i < cache.length; i++) {
+      rtn[i] = new Cache(cache[i].t, cache[i].s, cache[i].l);
+      for (let j = 0; j < cache[i].set.length; j++) {
+        for (let k = 0; k < cache[i].set[j].length; k++) {
+          rtn[i].set[j][k].tag = cache[i].set[j][k].tag;
+          rtn[i].set[j][k].valid = cache[i].set[j][k].valid;
+          for (let kk = 0; kk < cache[i].set[j][k].block.length; kk++) {
+            rtn[i].set[j][k].block[kk] = cache[i].set[j][k].block[kk];
+          }
+        }
+      }
+    }
+    return rtn;
+    //return cache.slice();
+  }
+  addCache(t = 60, s = 2, l = 1) {
+    let newCache = new Cache(t, s, l);
+    if (cache.length - 1 >= 0) cache[cache.length - 1].nextLevel = newCache;
+    cache.push(newCache);
+    for (let i = 0; i < cache.length; i++) {
+      cache[i].reset();
+    }
+  }
+  removeCache(i = cache.length - 1) {
+    cache[i] = null;
+    cache.splice(i, 1);
+    if (i - 1 >= 0) cache[i - 1].nextLevel = i < cache.length ? cache[i] : null;
+    for (let i = 0; i < cache.length; i++) {
+      cache[i].reset();
+    }
+  }
+
   getStageStuffs() {
     return [
       [
@@ -183,6 +230,84 @@ export class Pipe {
       ],
       [["predPC", valToHex(F_predPC)]]
     ];
+  }
+}
+//Guarantee that addr is int32 and s, b is small enough
+class Cache {
+  //l = 1 direact map
+  constructor(t = 60, s = 2, l = 1) {
+    //initialization
+    this.nextLevel = null;
+    this.s = s;
+    this.S = 1 << s;
+    this.t = t;
+    this.b = 64 - t - s;
+    this.B = 1 << this.b;
+    this.l = l;
+    this.set = [];
+    this.set.length = this.S;
+    for (let i = 0; i < this.set.length; i++) {
+      this.set[i] = [];
+      this.set[i].length = l;
+      for (let j = 0; j < l; j++) {
+        this.set[i][j] = {};
+        this.set[i][j].valid = false;
+        this.set[i][j].block = [""];
+        this.set[i][j].block.length = this.B;
+      }
+    }
+  }
+  reset() {
+    for (let i = 0; i < this.set.length; i++)
+      for (let j = 0; j < this.set[i].length; j++) this.set[i][j].valid = false;
+  }
+  setNextLevel(L2) {
+    this.nextLevel = L2;
+  }
+  read(addr) {
+    //s + b should be small
+    let t = addr >> (this.s + this.b);
+    let s = (addr - (t << (this.s + this.b))) >> this.b;
+    let b = addr - (t << (this.s + this.b)) - (s << this.b);
+    for (let i = 0; i < this.set[s].length; i++) {
+      if (this.set[s][i].tag == t && this.set[s][i].valid == true) {
+        //Hit
+        console.log("hit");
+        return this.set[s][i].block[b];
+      }
+    }
+    //Miss
+    console.log("miss");
+    //Address of the first block, erase the least significant bits
+    let ad = (addr >> this.b) << this.b;
+    //Random replacement policy: Randomly choose a line to replace
+    let i = parseInt(Math.random() * this.set[s].length, 10);
+    this.set[s][i].valid = true;
+    this.set[s][i].tag = t;
+    //The bottom of Cache Hierarchy is Memory
+    if (!this.nextLevel)
+      for (let j = 0; j < this.B; j++) this.set[s][i].block[j] = Memory[ad + j];
+    else
+      for (let j = 0; j < this.B; j++)
+        this.set[s][i].block[j] = this.nextLevel.read(ad + j);
+    return this.set[s][i].block[b];
+  }
+  //Write-Through, almost the same
+  write(addr, val) {
+    let t = addr >> (this.s + this.b);
+    let s = (addr - (t << (this.s + this.b))) >> this.b;
+    let b = addr - (t << (this.s + this.b)) - (s << this.b);
+    for (let i = 0; i < this.set[s].length; i++) {
+      if (this.set[s][i].tag == t && this.set[s][i].valid == true) {
+        //hit
+        console.log("hit");
+        this.set[s][i].block[b] = val;
+        break;
+      }
+    }
+    //No-write-allocate: When encountering a write miss, bypasses the cache and write directly to the next lower level
+    if (!this.nextLevel) Memory[addr] = val;
+    else this.nextLevel.write(addr, val);
   }
 }
 
@@ -304,6 +429,18 @@ let imem_error, dmem_error;
 let Memory = ["0"];
 Memory.length = MAX_MEM;
 
+/*
+
+let L1Cache = new Cache();
+let L2Cache = new Cache();
+
+L1Cache.setNextLevel(L2Cache);
+*/
+let cache = [];
+
+//cache.push(L1Cache);
+//cache.push(L2Cache);
+
 let registerFile = new RegisterFile();
 
 let alu_cc;
@@ -392,14 +529,17 @@ function xorq(valA, valB) {
 
 /* read eight bytes from memory, return null when error*/
 /* return rtn = ["00", "02", ...] */
-function readMemory(addr, bytes = 8) {
+/* opt = 0, read from cache, opt = 1, read directly from memory*/
+function readMemory(addr, bytes = 8, opt = 0) {
   if (addr + bytes > MAX_MEM || addr < 0) {
     return null;
   }
   let rtn = VALZERO.slice();
   rtn.length = bytes;
   for (let i = 0; i < bytes; i++) {
-    rtn[i] = Memory[addr + i];
+    rtn[i] =
+      opt == 0 && cache.length > 0 ? cache[0].read(addr + i) : Memory[addr + i]; //read cache
+    //rtn[i] = Memory[addr + i];
     if (rtn[i] == undefined) rtn[i] = "00";
   }
   return rtn;
@@ -409,7 +549,8 @@ function writeMemory(addr, val) {
   let len = val.length;
   if (addr + len > MAX_MEM || addr < 0) return null;
   for (let i = 0; i < len; i++) {
-    Memory[addr + i] = val[i];
+    if (cache.length > 0) cache[0].write(addr + i, val[i]);
+    else Memory[addr + i] = val[i];
   }
   return true;
 }
@@ -1082,6 +1223,13 @@ function updateStageRegisters() {
   } else if (!F_stall) F_predPC = f_predPC;
 }
 function init() {
+  /* reset memory */
+  Memory = ["0"];
+  Memory.length = MAX_MEM;
+  /* reset the caches */
+  for (let i = 0; i < cache.length; i++) {
+    cache[i].reset();
+  }
   /** reset registerFile **/
   registerFile.reset();
 

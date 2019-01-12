@@ -1,4 +1,5 @@
 import React, { Fragment } from "react";
+import Draggable from "react-draggable";
 
 import Tooltip from "@material-ui/core/Tooltip";
 import Popover from "@material-ui/core/Popover";
@@ -64,8 +65,13 @@ import InfoIcon from "@material-ui/icons/Info";
 import CloseIcon from "@material-ui/icons/Close";
 import SettingsIcon from "@material-ui/icons/Settings";
 import ReorderIcon from "@material-ui/icons/Reorder";
+import FilterListIcon from "@material-ui/icons/FilterList";
 import PauseIcon from "@material-ui/icons/Pause";
 import ChevronRightIcon from "@material-ui/icons/ChevronRight";
+import FavoriteIcon from "@material-ui/icons/Favorite";
+import ShareIcon from "@material-ui/icons/Share";
+import MoreVertIcon from "@material-ui/icons/MoreVert";
+import DeleteIcon from "@material-ui/icons/Delete";
 
 import TextField from "@material-ui/core/TextField";
 
@@ -392,7 +398,6 @@ class CodeLayout extends React.Component {
                   addr={address}
                   //classes={addr}
                   style={{
-                    //border: "1px blue solid",
                     fontSize: 15
                   }}
                   onContextMenu={() => {}}
@@ -673,12 +678,184 @@ class RegisterFileLayout extends React.Component {
   }
 }
 
+class CacheLayout extends React.Component {
+  state = {
+    cache: this.props.cache,
+    open: undefined,
+    expanded: [false]
+  };
+  init(ini) {
+    console.log("init");
+    let a = [];
+    let cache = this.props.cache;
+
+    a.length = cache.length;
+    for (let i = 0; i < cache.length; i++) {
+      a[i] = [];
+      a[i].length = cache[i].set.length;
+
+      for (let j = 0; j < cache[i].set.length; j++) {
+        a[i][j] = [];
+        a[i][j].length = cache[i].set[j].length;
+        for (let k = 0; k < cache[i].set[j].length; k++) {
+          a[i][j][k] = ini;
+        }
+      }
+    }
+    console.log(a);
+    return a;
+  }
+
+  render() {
+    const h = window.innerHeight;
+    const w = window.innerWidth;
+    //const cache = pipe.getCache();
+    const cache = this.props.cache;
+    let open = this.state.open;
+    let t = this;
+
+    return cache.map((cac, index) => {
+      return (
+        <Draggable>
+          <ExpansionPanel
+            expanded={
+              this.state.expanded[index] == undefined
+                ? false
+                : this.state.expanded[index]
+            }
+            style={{
+              position: "absolute",
+              top: (h / 3) * 1 + theme.spacing.unit * 3 * index,
+              left: (w / 3) * 1 + theme.spacing.unit * 10 * index
+            }}
+          >
+            <ExpansionPanelSummary
+              expandIcon={
+                <ExpandMoreIcon
+                  onClick={e => {
+                    let exp = this.state.expanded;
+                    if (index >= exp.length) {
+                      exp.length = index;
+                      exp[index] = false;
+                    }
+                    exp[index] = !exp[index];
+                    this.setState({ expanded: exp });
+                    //console.log("click more icon");
+                  }}
+                />
+              }
+            >
+              <Typography>L{index + 1} Cache</Typography>
+            </ExpansionPanelSummary>
+
+            <ExpansionPanelDetails style={{ padding: 0 }}>
+              <List
+                dense
+                style={{ maxHeight: h / 2, overflow: "auto", padding: 0 }}
+              >
+                {!cac
+                  ? null
+                  : cac.set.map((set, si) => {
+                      return !set
+                        ? null
+                        : set.map((line, li) => {
+                            if (!line) return null;
+                            if (!line.valid) return null;
+                            let addrBegin =
+                              (line.tag << (cac.s + cac.b)) + (si << cac.b);
+                            let addrEnd =
+                              (line.tag << (cac.s + cac.b)) +
+                              ((si + 1) << cac.b) -
+                              1;
+                            let value = pipe.getValueFromMemory(
+                              addrBegin,
+                              addrEnd - addrBegin + 1
+                            );
+
+                            return (
+                              <Grow
+                                in={
+                                  this.props.in == undefined
+                                    ? true
+                                    : this.props.in[index] == undefined
+                                    ? true
+                                    : this.props.in[index][si] == undefined
+                                    ? true
+                                    : this.props.in[index][si][li]
+                                  //return true;
+                                }
+                              >
+                                <Tooltip
+                                  title={value}
+                                  open={
+                                    this.state.open == undefined
+                                      ? false
+                                      : this.state.open[index] == undefined
+                                      ? false
+                                      : this.state.open[index][si] == undefined
+                                      ? false
+                                      : this.state.open[index][si][li]
+                                  }
+                                  onClose={() => {
+                                    let newOpen = this.state.open;
+                                    if (
+                                      !newOpen ||
+                                      index >= newOpen.length ||
+                                      !newOpen[index] ||
+                                      si >= newOpen[index].length ||
+                                      !newOpen[index][si] ||
+                                      li >= newOpen[index][si].length
+                                    )
+                                      newOpen = this.init(false);
+                                    newOpen[index][si][li] = false;
+                                    this.setState({ open: newOpen });
+                                  }}
+                                >
+                                  <ListItem
+                                    button
+                                    onClick={() => {
+                                      let newOpen = this.state.open;
+                                      if (!newOpen) {
+                                        newOpen = this.init(false);
+                                        //console.log(newOpen);
+                                      }
+                                      newOpen[index][si][li] = !newOpen[index][
+                                        si
+                                      ][li];
+                                      this.setState({ open: newOpen });
+                                    }}
+                                  >
+                                    <Typography noWrap>
+                                      {"0x" +
+                                        addrBegin.toString(16) +
+                                        "~" +
+                                        "0x" +
+                                        addrEnd.toString(16)}
+                                    </Typography>
+                                  </ListItem>
+                                </Tooltip>
+                              </Grow>
+                            );
+                          });
+                    })}
+                ) }
+              </List>
+            </ExpansionPanelDetails>
+          </ExpansionPanel>
+        </Draggable>
+      );
+    });
+  }
+}
+
 class MenuLayout extends React.Component {
   state = {
     settingExpanded: false,
     openMemory: false,
+    openCache: false,
     openAbout: false,
     memory: [],
+    cache: [],
     speedMenuOpen: false,
     anchorEl: null,
     speedIndex: 0
@@ -688,6 +865,7 @@ class MenuLayout extends React.Component {
   }
 
   render() {
+    const mainLayout = this.props.parent;
     const { anchorEl } = this.state;
     return (
       <div>
@@ -762,6 +940,24 @@ class MenuLayout extends React.Component {
             </ListItemIcon>
             <ListItemText primary="Memory" />
           </ListItem>
+          <ListItem
+            button
+            onClick={event => {
+              this.setState({
+                openCache: true,
+                cache: pipe.getCache()
+              });
+            }}
+          >
+            <ListItemIcon>
+              <FilterListIcon
+                style={{
+                  transform: "rotate(180deg)"
+                }}
+              />
+            </ListItemIcon>
+            <ListItemText inset primary="Cache" />
+          </ListItem>
         </List>
         <Divider />
         <List>
@@ -800,6 +996,72 @@ class MenuLayout extends React.Component {
               })}
             </DialogContentText>
           </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={this.state.openCache}
+          onClose={() => {
+            this.setState({ openCache: false });
+          }}
+          scroll="paper"
+          keepMounted
+          TransitionComponent={this.Transition}
+        >
+          <DialogTitle>Cache Hierarchy</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {this.state.cache.map((cache, index) => {
+                return (
+                  <div>
+                    <Button style={{ textTransform: "none" }}>
+                      {"L" +
+                        (index + 1) +
+                        ": " +
+                        "t[" +
+                        cache.t +
+                        "] s[" +
+                        cache.s +
+                        "] b[" +
+                        cache.b +
+                        "]"}
+                    </Button>
+                    <IconButton
+                      onClick={() => {
+                        pipe.removeCache(index);
+                        let cac = pipe.getCache();
+                        if (cac.length == 0) {
+                          this.setState({ openCache: false });
+                        } else this.setState({ cache: cac });
+                        mainLayout.initCache();
+                        mainLayout.refreshCache();
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </div>
+                );
+              })}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={event => {
+                let cac = pipe.getCache();
+                if (cac.length > 0)
+                  pipe.addCache(
+                    cac[cac.length - 1].t - 1,
+                    cac[cac.length - 1].s + 1
+                  );
+                else pipe.addCache();
+                this.setState({ cache: pipe.getCache() });
+                mainLayout.initCache();
+                mainLayout.refreshCache();
+              }}
+              color="primary"
+            >
+              Add
+            </Button>
+          </DialogActions>
         </Dialog>
         <Dialog
           open={this.state.openAbout}
@@ -844,6 +1106,9 @@ class MainLayout extends React.Component {
       messageQueue: [],
       snackbarOpen: false,
       anchorEl: null,
+      cacheIn: [[[]]],
+      cache: pipe.getCache(),
+      oldCache: pipe.getCache(),
       stageRegisters: pipe.getStageRegisters(),
       stageStuffs: pipe.getStageStuffs(),
       registerFile: pipe.getRegisterFile()
@@ -879,6 +1144,7 @@ class MainLayout extends React.Component {
 
       t.setState({ stageRegisters: pipe.getStageRegisters() });
       t.setState({ registerFile: pipe.getRegisterFile() });
+      t.refreshCache();
       t.setState({ stageIn: false });
       setTimeout(() => {
         t.setState({ stageIn: true });
@@ -914,6 +1180,45 @@ class MainLayout extends React.Component {
     }, 20);
   }
 
+  initCache() {
+    let newCache = pipe.getCache();
+    this.setState({ cache: newCache });
+  }
+  refreshCache() {
+    let newCache = pipe.getCache();
+    let oldCache = this.state.cache;
+    let newIn = [];
+    newIn.length = newCache.length;
+    for (let i = 0; i < newCache.length; i++) {
+      newIn[i] = [];
+      newIn[i].length = newCache[i].set.length;
+      for (let j = 0; j < newCache[i].set.length; j++) {
+        newIn[i][j] = [];
+        newIn[i][j].length = newCache[i].set[j].length;
+
+        for (let k = 0; k < newCache[i].set[j].length; k++) {
+          if (
+            !oldCache ||
+            i >= oldCache.length ||
+            !oldCache[i].set ||
+            j >= oldCache[i].set.length ||
+            !oldCache[i].set[j] ||
+            k >= oldCache[i].set[j].length ||
+            oldCache[i].set[j][k].tag != newCache[i].set[j][k].tag
+          )
+            newIn[i][j][k] = false;
+          else newIn[i][j][k] = true;
+          //newIn[i][j][k] = true;
+        }
+      }
+    }
+    console.log("new In");
+    console.log(newIn);
+    this.setState({ cacheIn: newIn });
+    setTimeout(() => {
+      this.setState({ cache: newCache, cacheIn: undefined });
+    }, 500);
+  }
   refreshStageRegisters(flag = 1) {
     this.setState({ stageRegisters: pipe.getStageRegisters() });
     this.setState({ registerFile: pipe.getRegisterFile() });
@@ -967,6 +1272,7 @@ class MainLayout extends React.Component {
         return rtn;
     }
     this.refreshStageRegisters(flag);
+    this.refreshCache();
     return rtn;
   }
 
@@ -974,39 +1280,6 @@ class MainLayout extends React.Component {
     const { classes } = this.props;
     const { anchorEl } = this.state;
 
-    const drawerList = (
-      <div className={classes.list}>
-        <List>
-          <ListItem>
-            <ListItemText primary="HELLO" />
-          </ListItem>
-          <ListItem button>
-            <ListItemText primary="Setting" />
-          </ListItem>
-          <Collapse in={this.state.expanded} timeout="auto" unmountOnExit>
-            <ListItem>
-              <ListItemText primary="Speed" onClick={e => {}} />
-            </ListItem>
-            <ListItem>
-              <ListItemText primary="Speed" onClick={e => {}} />
-            </ListItem>
-          </Collapse>
-
-          <ListItem>
-            <ListItemText primary="" />
-          </ListItem>
-        </List>
-        <Divider />
-        <List>
-          <ListItem button key="About">
-            <ListItemIcon>
-              <InfoIcon />
-            </ListItemIcon>
-            <ListItemText primary="About" />
-          </ListItem>
-        </List>
-      </div>
-    );
     return (
       <div className={classes.root}>
         <CssBaseline />
@@ -1017,7 +1290,7 @@ class MainLayout extends React.Component {
               this.setState({ drawerOpen: false });
             }}
           >
-            <MenuLayout />
+            <MenuLayout parent={this} />
             <div
               tabIndex={0}
               role="button"
@@ -1080,6 +1353,17 @@ class MainLayout extends React.Component {
                 {appBarTitle}
               </Typography>
             </Toolbar>
+
+            <div
+              style={{
+                position: "fixed",
+                height: 0,
+
+                hide: "true"
+              }}
+            >
+              <CacheLayout in={this.state.cacheIn} cache={this.state.cache} />
+            </div>
           </AppBar>
           {
             //}toast
@@ -1122,6 +1406,7 @@ class MainLayout extends React.Component {
                 hide={!this.state.run}
               />
             </div>
+
             <div
               style={{
                 width: "100%",
