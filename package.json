@@ -1,7 +1,7 @@
 {
   "name": "sim-cpu",
   "version": "1.0.0",
-  "homepage": "https://lihongqinzhuanyong.github.io/",
+  "homepage": "https://lihongqinzhuanyong.github.io/sim-cpu/",
   "description": "",
   "keywords": [],
   "main": "src/index.js",
